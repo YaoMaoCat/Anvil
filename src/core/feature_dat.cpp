@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 
+#include <algorithm>
 #include <cstring>
 
 namespace anvil::core {
@@ -86,32 +87,112 @@ bool DesCbcDecrypt(const std::string& input, std::string* output, std::string* e
     return true;
 }
 
+std::vector<std::string> RegistryTargets() {
+    std::vector<std::string> dirs;
+    HKEY root = nullptr;
+    const wchar_t* sub = L"SOFTWARE\\Topdomain";
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub, 0, KEY_READ | KEY_WOW64_32KEY, &root) != ERROR_SUCCESS &&
+        RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub, 0, KEY_READ, &root) != ERROR_SUCCESS) {
+        return dirs;
+    }
+
+    for (DWORD index = 0;; ++index) {
+        wchar_t name[256] = {};
+        DWORD name_len = 256;
+        if (RegEnumKeyExW(root, index, name, &name_len, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) {
+            break;
+        }
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(root, name, 0, KEY_READ, &key) != ERROR_SUCCESS) {
+            continue;
+        }
+        wchar_t buffer[MAX_PATH * 2] = {};
+        DWORD size = sizeof(buffer) - sizeof(wchar_t);
+        DWORD type = 0;
+        const LONG status = RegQueryValueExW(key, L"TargetDirectory", nullptr, &type,
+                                            reinterpret_cast<LPBYTE>(buffer), &size);
+        RegCloseKey(key);
+        if (status == ERROR_SUCCESS && type == REG_SZ && buffer[0] != L'\0') {
+            dirs.push_back(WideToUtf8(buffer));
+        }
+    }
+    RegCloseKey(root);
+    return dirs;
+}
+
+std::vector<std::string> MythwareDirs() {
+    std::vector<std::string> dirs;
+    const wchar_t* bases[] = {L"C:\\Program Files (x86)\\Mythware", L"C:\\Program Files\\Mythware"};
+    for (const wchar_t* base : bases) {
+        const std::wstring pattern = std::wstring(base) + L"\\*";
+        WIN32_FIND_DATAW data = {};
+        HANDLE find = FindFirstFileW(pattern.c_str(), &data);
+        if (find == INVALID_HANDLE_VALUE) {
+            continue;
+        }
+        do {
+            if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+                continue;
+            }
+            if (wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0) {
+                continue;
+            }
+            dirs.push_back(WideToUtf8(std::wstring(base) + L"\\" + data.cFileName));
+        } while (FindNextFileW(find, &data));
+        FindClose(find);
+    }
+    return dirs;
+}
+
+// Windows 路径大小写不敏感，去重和比较都按小写
+std::string LowerAscii(std::string text) {
+    for (char& ch : text) {
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch - 'A' + 'a');
+        }
+    }
+    return text;
+}
+
+bool FileExists(const std::string& path) {
+    const std::wstring wide = Utf8ToWide(path);
+    const DWORD attributes = GetFileAttributesW(wide.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
 } // namespace
 
+std::vector<std::string> FeatureData::Candidates() {
+    std::vector<std::string> dirs = RegistryTargets();
+    for (const std::string& dir : MythwareDirs()) {
+        dirs.push_back(dir);
+    }
+
+    std::vector<std::string> paths;
+    for (std::string dir : dirs) {
+        if (dir.empty()) {
+            continue;
+        }
+        if (dir.back() != '\\' && dir.back() != '/') {
+            dir.push_back('\\');
+        }
+        const std::string path = dir + "Feature.dat";
+        if (!FileExists(path)) {
+            continue;
+        }
+        const std::string key = LowerAscii(path);
+        const bool seen = std::any_of(paths.begin(), paths.end(),
+                                      [&key](const std::string& existing) { return LowerAscii(existing) == key; });
+        if (!seen) {
+            paths.push_back(path);
+        }
+    }
+    return paths;
+}
+
 std::string FeatureData::DefaultPath() {
-    HKEY key = nullptr;
-    const wchar_t* sub = L"SOFTWARE\\Topdomain\\e-Learning Class V6.0";
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub, 0, KEY_READ | KEY_WOW64_32KEY, &key) != ERROR_SUCCESS &&
-        RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub, 0, KEY_READ, &key) != ERROR_SUCCESS) {
-        return {};
-    }
-
-    wchar_t buffer[MAX_PATH * 2] = {};
-    DWORD size = sizeof(buffer) - sizeof(wchar_t);
-    DWORD type = 0;
-    const LONG status = RegQueryValueExW(key, L"TargetDirectory", nullptr, &type,
-                                        reinterpret_cast<LPBYTE>(buffer), &size);
-    RegCloseKey(key);
-    if (status != ERROR_SUCCESS || type != REG_SZ) {
-        return {};
-    }
-
-    std::wstring directory(buffer);
-    if (!directory.empty() && directory.back() != L'\\' && directory.back() != L'/') {
-        directory.push_back(L'\\');
-    }
-    directory += L"Feature.dat";
-    return WideToUtf8(directory);
+    const std::vector<std::string> paths = Candidates();
+    return paths.empty() ? std::string{} : paths.front();
 }
 
 bool FeatureData::Load(const std::string& path) {
@@ -120,7 +201,7 @@ bool FeatureData::Load(const std::string& path) {
     error_.clear();
 
     if (path.empty()) {
-        error_ = "没找到安装目录（注册表 Topdomain\\e-Learning Class V6.0 无 TargetDirectory）";
+        error_ = "没找到任何 Feature.dat（注册表 Topdomain 与 Mythware 目录里都没有）";
         return false;
     }
 

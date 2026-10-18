@@ -12,7 +12,11 @@ namespace anvil::core {
 // 产品号就是其中的 UninstId0..UninstId(N-1)，每个版本/版本类型各自不同。
 class FeatureData {
 public:
-    // 从注册表 Topdomain\e-Learning Class V6.0 的 TargetDirectory 定位安装目录
+    // 所有可能装了 Feature.dat 的路径：注册表 Topdomain 下每个子键的 TargetDirectory
+    // + C:\Program Files (x86)\Mythware\* 各个版本目录，按存在性过滤、去重
+    static std::vector<std::string> Candidates();
+
+    // 第一个存在的候选（注册表优先）
     static std::string DefaultPath();
 
     bool Load(const std::string& path);

@@ -37,7 +37,17 @@
 
 本机实测：40 条记录，`UninstIdCount=1`、`UninstId0=10652`、`TrailDays=30`。
 
-工具会自己从注册表 `HKLM\SOFTWARE\WOW6432Node\Topdomain\e-Learning Class V6.0` 的 `TargetDirectory` 找到 `Feature.dat`，读不到才退回默认值 10652。
+路径不是写死的，按下面顺序找，全部命中都会列出来：
+
+1. 注册表 `HKLM\SOFTWARE\WOW6432Node\Topdomain` 下**每个子键**的 `TargetDirectory`
+2. `C:\Program Files (x86)\Mythware\*` 与 `C:\Program Files\Mythware\*` 下每个版本目录
+
+```
+Anvil --feature                            # 列出所有已装版本及其产品号
+Anvil --feature "D:\某个版本目录"           # 只看指定版本（传目录或 .dat 都行）
+```
+
+实测同一台机器上：`2016 豪华版 = 10673`、`2017 标准版 = 10652` —— 确实随版本变，所以绝不能写死。
 
 ### 机器特征码
 

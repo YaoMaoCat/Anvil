@@ -52,10 +52,11 @@ public:
         core::FeatureData feature;
         if (feature.Load(core::FeatureData::DefaultPath()) && !feature.ProductIds().empty()) {
             std::snprintf(product_, sizeof(product_), "%d", feature.ProductIds().front());
+            from_feature_ = true;
         }
         RefreshMachine();
         std::snprintf(serial_, sizeof(serial_), "%s", core::Serial::Random().c_str());
-        status_ = "就绪";
+        status_ = from_feature_ ? std::string("就绪｜产品号 ") + product_ + " 取自 Feature.dat" : "就绪";
         return true;
     }
 
@@ -264,6 +265,7 @@ private:
 
     Gfx gfx_;
     theme::Fonts fonts_;
+    bool from_feature_ = false;
     int frames_ = 0;
     std::string cpu_;
     std::string macs_;

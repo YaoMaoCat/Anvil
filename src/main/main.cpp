@@ -6,6 +6,9 @@
 #include "core/serial.h"
 #include "ui/app.h"
 
+#include <windows.h>
+#include <shellapi.h>
+
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -14,18 +17,50 @@
 
 namespace {
 
+// 控制台给的 argv 是 ANSI 的，中文路径会变成 '?'；统一改从宽字符命令行取 UTF-8
+std::vector<std::string> WideArgs() {
+    std::vector<std::string> args;
+    int count = 0;
+    LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (wide == nullptr) {
+        return args;
+    }
+    for (int i = 1; i < count; ++i) {
+        const int size = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
+        std::string item;
+        if (size > 1) {
+            item.assign(static_cast<std::size_t>(size - 1), ' ');
+            WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, item.data(), size, nullptr, nullptr);
+        }
+        args.push_back(item);
+    }
+    LocalFree(wide);
+    return args;
+}
+
+std::wstring Utf8ToWide(const std::string& text) {
+    const int size = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+    std::wstring out(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L' ');
+    if (size > 1) {
+        MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, out.data(), size);
+    }
+    return out;
+}
+
 void PrintUsage() {
     std::cout <<
         "Anvil - 授权文件生成器\n"
         "\n"
         "  Anvil                       打开图形界面\n"
+        "  Anvil --feature [文件|目录]  列出/解析 Feature.dat（不填则扫描全部已装版本）\n"
+        "  Anvil --probe               从运行中的教师端读取产品号/机器码\n"
         "  Anvil --dump <file.lic>     解密并打印明文 XML\n"
         "  Anvil --code <机器码> [选项] 命令行生成\n"
         "\n"
         "生成选项：\n"
         "  --out <file>       输出路径，默认 <序列号>.lic\n"
         "  --serial <20位>    指定序列号，默认随机\n"
-        "  --product <n>      产品号，默认 10652\n"
+        "  --product <n>      产品号，默认从 Feature.dat 自动读取\n"
         "  --students <n>     学生席位，默认 1\n"
         "  --period <时间>    到期时间，默认 2099-12-31 23:59:59\n";
 }
@@ -42,22 +77,57 @@ int RunDump(const std::string& path) {
     return 0;
 }
 
-int RunFeature(const std::string& given_path) {
-    anvil::core::FeatureData data;
-    const std::string path = given_path.empty() ? anvil::core::FeatureData::DefaultPath() : given_path;
-    if (!data.Load(path)) {
-        std::cerr << "读取失败: " << data.error() << "\n";
-        return 4;
+// 传目录时自动补 Feature.dat
+std::string NormalizeFeaturePath(const std::string& path) {
+    if (path.empty()) {
+        return path;
     }
-    std::cout << "文件       : " << path << "\n"
-              << "试用天数   : " << data.TrailDays() << "\n"
-              << "产品表数量 : " << data.ProductIdCount() << "\n"
-              << "产品号     :";
+    const bool looks_like_file = path.size() > 4 && path.compare(path.size() - 4, 4, ".dat") == 0;
+    if (looks_like_file) {
+        return path;
+    }
+    std::string full = path;
+    if (full.back() != '\\' && full.back() != '/') {
+        full.push_back('\\');
+    }
+    return full + "Feature.dat";
+}
+
+int ReportFeature(const std::string& path) {
+    if (GetFileAttributesW(Utf8ToWide(path).c_str()) == INVALID_FILE_ATTRIBUTES) {
+        std::cout << "[--] " << path << "\n     该目录没有 Feature.dat（版本可能未完整安装）\n";
+        return 1;
+    }
+    anvil::core::FeatureData data;
+    if (!data.Load(path)) {
+        std::cout << "[!!] " << path << "\n     " << data.error() << "\n";
+        return 1;
+    }
+    std::cout << "[OK] " << path << "\n"
+              << "     试用天数 " << data.TrailDays() << "，产品表 " << data.ProductIdCount() << " 项：";
     for (int id : data.ProductIds()) {
         std::cout << " " << id;
     }
     std::cout << "\n";
     return 0;
+}
+
+int RunFeature(const std::string& given_path) {
+    if (!given_path.empty()) {
+        return ReportFeature(NormalizeFeaturePath(given_path)) == 0 ? 0 : 4;
+    }
+
+    const std::vector<std::string> paths = anvil::core::FeatureData::Candidates();
+    if (paths.empty()) {
+        std::cerr << "没有找到任何 Feature.dat（注册表 Topdomain 与 Mythware 目录里都没有）\n";
+        return 4;
+    }
+    std::cout << "共找到 " << paths.size() << " 个已安装版本：\n\n";
+    int bad = 0;
+    for (const std::string& path : paths) {
+        bad += ReportFeature(path);
+    }
+    return bad == 0 ? 0 : 0;
 }
 
 int RunProbe() {
@@ -145,8 +215,8 @@ int RunGenerate(const std::vector<std::string>& args) {
 
 } // namespace
 
-int main(int argc, char** argv) {
-    std::vector<std::string> args(argv + 1, argv + argc);
+int main() {
+    const std::vector<std::string> args = WideArgs();
 
     if (args.empty()) {
         return anvil::ui::Run();

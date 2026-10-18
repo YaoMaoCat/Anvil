@@ -4,6 +4,7 @@
 #include <tlhelp32.h>
 
 #include <chrono>
+#include <string>
 #include <cstdio>
 #include <thread>
 
@@ -129,6 +130,15 @@ ClientProbe ProbeOnce() {
     }
 
     CloseHandle(process);
+    // 不同版本的 DLL 布局可能不同，读到明显不合理的值就明确报错，不要给假数据
+    if (result.error.empty()) {
+        const bool digits_only = !result.machine_code.empty() &&
+                                 result.machine_code.find_first_not_of("0123456789.") == std::string::npos;
+        if (!digits_only || result.product <= 0 || result.product > 10000000) {
+            result.error = "读到的字段不合理（该版本 DLL 的偏移可能不同），请手动填写产品号";
+            result.product = 0;
+        }
+    }
     result.ok = result.error.empty() && result.product > 0;
     return result;
 }
