@@ -1,3 +1,5 @@
+#include "core/client_probe.h"
+#include "core/feature_dat.h"
 #include "core/lic_codec.h"
 #include "core/license.h"
 #include "core/machine_id.h"
@@ -40,9 +42,44 @@ int RunDump(const std::string& path) {
     return 0;
 }
 
+int RunFeature(const std::string& given_path) {
+    anvil::core::FeatureData data;
+    const std::string path = given_path.empty() ? anvil::core::FeatureData::DefaultPath() : given_path;
+    if (!data.Load(path)) {
+        std::cerr << "读取失败: " << data.error() << "\n";
+        return 4;
+    }
+    std::cout << "文件       : " << path << "\n"
+              << "试用天数   : " << data.TrailDays() << "\n"
+              << "产品表数量 : " << data.ProductIdCount() << "\n"
+              << "产品号     :";
+    for (int id : data.ProductIds()) {
+        std::cout << " " << id;
+    }
+    std::cout << "\n";
+    return 0;
+}
+
+int RunProbe() {
+    const anvil::core::ClientProbe probe = anvil::core::ReadFromTeacher(3000);
+    if (!probe.ok) {
+        std::cerr << "读取失败: " << probe.error << "\n";
+        return 4;
+    }
+    std::cout << "进程       : " << probe.pid << "\n"
+              << "产品号     : " << probe.product << "\n"
+              << "mainver    : " << probe.mainver << "\n"
+              << "eclass 掩码: " << probe.mask << "\n"
+              << "机器特征码 : " << probe.machine_code << "\n"
+              << "CPU        : " << probe.cpu << "\n"
+              << "网卡       : " << probe.macs << "\n";
+    return 0;
+}
+
 int RunGenerate(const std::vector<std::string>& args) {
     anvil::core::LicenseSpec spec;
     std::string output;
+    bool product_set = false;
 
     for (std::size_t i = 0; i < args.size(); ++i) {
         const std::string& key = args[i];
@@ -56,6 +93,7 @@ int RunGenerate(const std::vector<std::string>& args) {
         } else if (key == "--product" && has_value) {
             spec.product = std::atoi(args[++i].c_str());
             spec.subver = spec.product;
+            product_set = true;
         } else if (key == "--students" && has_value) {
             spec.eclass_value = std::atoi(args[++i].c_str());
         } else if (key == "--period" && has_value) {
@@ -63,6 +101,18 @@ int RunGenerate(const std::vector<std::string>& args) {
         }
     }
 
+
+    if (!product_set) {
+        anvil::core::FeatureData data;
+        if (data.Load(anvil::core::FeatureData::DefaultPath())) {
+            const std::vector<int> ids = data.ProductIds();
+            if (!ids.empty()) {
+                spec.product = ids.front();
+                spec.subver = ids.front();
+                std::cout << "产品号取自 Feature.dat: " << spec.product << "\n";
+            }
+        }
+    }
     if (spec.serial.empty()) {
         spec.serial = anvil::core::Serial::Random();
     }
@@ -104,6 +154,12 @@ int main(int argc, char** argv) {
     if (args[0] == "--help" || args[0] == "-h") {
         PrintUsage();
         return 0;
+    }
+    if (args[0] == "--feature") {
+        return RunFeature(args.size() >= 2 ? args[1] : std::string{});
+    }
+    if (args[0] == "--probe") {
+        return RunProbe();
     }
     if (args[0] == "--dump" && args.size() >= 2) {
         return RunDump(args[1]);

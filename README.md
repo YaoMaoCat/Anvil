@@ -21,6 +21,24 @@
 
 成功后客户端显示「更新授权成功！」，授权信息里出现序列号、席位数与到期时间。
 
+### 产品号从哪来（Feature.dat）
+
+产品号**不是常量**，来自安装目录的 `Feature.dat`，每个版本/版本类型各带一份，所以换版本就可能不同。这个文件是可离线解开的：
+
+```
+算法   DES-CBC，IV 全 0，ECB 之外没有别的花样
+密钥   "3GNIKNAN"
+       由 EXE 里四个常量异或得到：0x7BE ^ 0x4E4149F5 = "KNAN"，
+       0x962 ^ 0x494E4E51 = "3GNI"，按 [esp+0xC] 顺序拼成 "3GNIKNAN"
+结构   4 字节 "PCLE" + 4 字节版本(0x00020004) + 4 字节记录数
+       随后每条 260 字节：键名(256, ASCII, NUL 结尾) + uint32 小端值
+关键键 UninstIdCount / UninstId0..N-1（就是产品表）、TrailDays（试用天数）
+```
+
+本机实测：40 条记录，`UninstIdCount=1`、`UninstId0=10652`、`TrailDays=30`。
+
+工具会自己从注册表 `HKLM\SOFTWARE\WOW6432Node\Topdomain\e-Learning Class V6.0` 的 `TargetDirectory` 找到 `Feature.dat`，读不到才退回默认值 10652。
+
 ### 机器特征码
 
 ```
@@ -109,6 +127,8 @@ ANVIL_SELFTEST=run Anvil.exe    # 生成后界面留着，便于抓图
 ```
 Anvil                                              # 图形界面
 Anvil --dump out.lic                               # 解密查看明文
+Anvil --feature                                    # 列出 Feature.dat 里的产品号/试用天数
+Anvil --probe                                      # 从运行中的教师端读产品号/掩码/机器码
 Anvil --code 6381189083307748 --out out.lic        # 命令行生成
 Anvil --code ... --students 50 --period 2030-01-01 00:00:00
 ```

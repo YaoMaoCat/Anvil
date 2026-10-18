@@ -1,5 +1,6 @@
 #include "ui/app.h"
 
+#include "core/feature_dat.h"
 #include "core/license.h"
 #include "core/machine_id.h"
 #include "core/serial.h"
@@ -47,6 +48,11 @@ public:
             return false;
         }
         fonts_ = theme::LoadFonts(gfx_.Scale());
+        // 产品号随安装版本变化，优先从 Feature.dat 自动取，取不到才用默认值
+        core::FeatureData feature;
+        if (feature.Load(core::FeatureData::DefaultPath()) && !feature.ProductIds().empty()) {
+            std::snprintf(product_, sizeof(product_), "%d", feature.ProductIds().front());
+        }
         RefreshMachine();
         std::snprintf(serial_, sizeof(serial_), "%s", core::Serial::Random().c_str());
         status_ = "就绪";

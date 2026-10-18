@@ -10,10 +10,12 @@ add_library(anvil_core STATIC
     core/machine_id.cpp
     core/serial.cpp
     core/license.cpp
+    core/client_probe.cpp
+    core/feature_dat.cpp
 )
 
 target_include_directories(anvil_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(anvil_core PUBLIC iphlpapi)
+target_link_libraries(anvil_core PUBLIC iphlpapi advapi32 crypt32)
 
 # ------------------------------------------------------------------ imgui
 add_library(anvil_imgui STATIC
