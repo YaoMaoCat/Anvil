@@ -36,6 +36,7 @@ add_executable(Anvil
     ui/gfx.cpp
     ui/theme.cpp
     ui/xml_pretty.cpp
+    ui/version_picker.cpp
     ui/app.cpp
 )
 

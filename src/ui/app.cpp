@@ -6,6 +6,7 @@
 #include "core/serial.h"
 #include "ui/gfx.h"
 #include "ui/theme.h"
+#include "ui/version_picker.h"
 #include "ui/xml_pretty.h"
 
 #include <imgui.h>
@@ -48,15 +49,14 @@ public:
             return false;
         }
         fonts_ = theme::LoadFonts(gfx_.Scale());
-        // 产品号随安装版本变化，优先从 Feature.dat 自动取，取不到才用默认值
-        core::FeatureData feature;
-        if (feature.Load(core::FeatureData::DefaultPath()) && !feature.ProductIds().empty()) {
-            std::snprintf(product_, sizeof(product_), "%d", feature.ProductIds().front());
-            from_feature_ = true;
+        // 产品号随安装版本变化：扫描所有已装版本，默认用第一个
+        versions_.Scan();
+        if (const int first = versions_.InitialProduct(); first > 0) {
+            std::snprintf(product_, sizeof(product_), "%d", first);
         }
         RefreshMachine();
         std::snprintf(serial_, sizeof(serial_), "%s", core::Serial::Random().c_str());
-        status_ = from_feature_ ? std::string("就绪｜产品号 ") + product_ + " 取自 Feature.dat" : "就绪";
+        status_ = versions_.empty() ? "就绪" : std::string("就绪｜产品号 ") + product_ + " 取自 Feature.dat";
         return true;
     }
 
@@ -143,6 +143,11 @@ private:
     void DrawParameters() {
         Section("授权参数");
         const float input_width = 250.0f * gfx_.Scale();
+
+        if (const int picked = versions_.DrawCombo(gfx_.Scale()); picked > 0) {
+            std::snprintf(product_, sizeof(product_), "%d", picked);
+            status_ = "已切换版本，产品号 " + std::to_string(picked);
+        }
 
         ImGui::TextDisabled("产品号");
         ImGui::SameLine(kLabelOffset * gfx_.Scale());
@@ -265,7 +270,7 @@ private:
 
     Gfx gfx_;
     theme::Fonts fonts_;
-    bool from_feature_ = false;
+    VersionPicker versions_;
     int frames_ = 0;
     std::string cpu_;
     std::string macs_;
