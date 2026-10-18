@@ -7,5 +7,10 @@ CMakeUserPresets.json
 # 生成的授权文件
 *.lic
 
+# 抓图中间产物
+gui.log
+/*.png
+
 # 第三方预编译包（150MB+，不入库，见 README 的获取方式）
 third-party/rmlui/
+third-party/imgui/

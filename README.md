@@ -1,8 +1,8 @@
 # Anvil
 
-极域课堂管理系统 V6.0（2017 标准版）`.lic` 授权文件生成器。CMake + C++20 + RmlUi。
+极域课堂管理系统 V6.0（2017 标准版）`.lic` 授权文件生成器。CMake + C++20 + Dear ImGui。
 
-界面用 RmlUi 6.3（预编译静态库），核心逻辑是纯 C++、不依赖 UI，可以单独做 CLI。
+界面用 Dear ImGui 1.93（Win32 + D3D11 后端，源码内置在 `third-party/imgui`），Win10 方正风格；核心逻辑是纯 C++、不依赖 UI，可以单独做 CLI。
 
 ## 授权文件的判定链
 
@@ -66,19 +66,21 @@ src/
 │   ├── machine_id.*   CPUID + 网卡 -> 机器特征码
 │   ├── serial.*       序列号规则与生成
 │   └── license.*      授权结构与 XML 构造、落盘
-├── ui/        RmlUi 界面（app.cpp：初始化 / 事件 / 主循环）
+├── ui/        ImGui 界面
+│   ├── gfx.*         Win32 窗口 + D3D11 交换链 + 帧循环（含 DPI 缩放）
+│   ├── theme.*       Win10 风格主题与字体（雅黑 / Consolas）
+│   ├── xml_pretty.*  预览用的 XML 缩进
+│   └── app.*         布局、交互、生成流程
 └── main/      CLI 入口
-assets/        main.rml / main.rcss
+tools/         screenshot.py（抓窗口图）、click.py（点控件，回归用）
+docs/          screenshot.png
 ```
 
 ## 构建
 
 依赖：Visual Studio 2022+（MSVC）、CMake 3.20+。
 
-第三方需要两个预编译包，放在 `third-party/rmlui/`：
-
-1. RmlUi 6.3 win64 二进制包（`Bin-Static/`、`Include/`、`Backends/`、`Dependencies/`）
-2. 其 `Dependencies/Bin-Static` 里的 FreeType（CMake 会自动从这里找）
+第三方只依赖 Dear ImGui 源码，放在 `third-party/imgui/`（需要 `imgui.cpp`、`imgui_draw.cpp`、`imgui_tables.cpp`、`imgui_widgets.cpp` 与 `backends/imgui_impl_win32.*`、`backends/imgui_impl_dx11.*`），无需预编译库，也不需要 FreeType。
 
 VS 直接「打开文件夹」即可识别 CMake 工程；也可以：
 
@@ -91,7 +93,16 @@ cmake --build build --config Release
 
 ## 使用
 
-图形界面：直接运行 `Anvil.exe`。
+图形界面：直接运行 `Anvil.exe`（按屏幕 DPI 自动缩放，Win10 方正风格）。
+
+![界面](docs/screenshot.png)
+
+自动化冒烟测试（不开窗口操作，直接跑一次生成流程）：
+
+```
+ANVIL_SELFTEST=1 Anvil.exe      # 生成后退出，状态打到 stderr
+ANVIL_SELFTEST=run Anvil.exe    # 生成后界面留着，便于抓图
+```
 
 命令行：
 

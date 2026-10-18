@@ -1,7 +1,6 @@
 # Anvil 核心与界面目标
 
-set(THIRD_PARTY "${CMAKE_SOURCE_DIR}/third-party/rmlui")
-set(RMLUI_DEPS "${THIRD_PARTY}/Dependencies/Bin-Static")
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/third-party/imgui")
 
 # ------------------------------------------------------------------ core
 add_library(anvil_core STATIC
@@ -16,30 +15,29 @@ add_library(anvil_core STATIC
 target_include_directories(anvil_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(anvil_core PUBLIC iphlpapi)
 
-# ------------------------------------------------------------------ rmlui
-# RmlUi 6.3 预编译包：先手动定位 Freetype，满足其 Dependencies.cmake 的检查
-set(Freetype_DIR "${RMLUI_DEPS}/share/freetype" CACHE PATH "" FORCE)
-find_package(Freetype CONFIG REQUIRED)
-
-set(RmlUi_DIR "${THIRD_PARTY}/Bin-Static/CMake" CACHE PATH "" FORCE)
-find_package(RmlUi CONFIG REQUIRED)
-
-# ------------------------------------------------------------------ app
-set(RMLUI_BACKENDS "${THIRD_PARTY}/Backends")
-
-add_executable(Anvil
-    main/main.cpp
-    ui/app.cpp
-    ${RMLUI_BACKENDS}/RmlUi_Backend_Win32_DX11.cpp
-    ${RMLUI_BACKENDS}/RmlUi_Platform_Win32.cpp
-    ${RMLUI_BACKENDS}/RmlUi_Renderer_DX11.cpp
+# ------------------------------------------------------------------ imgui
+add_library(anvil_imgui STATIC
+    "${IMGUI_DIR}/imgui.cpp"
+    "${IMGUI_DIR}/imgui_draw.cpp"
+    "${IMGUI_DIR}/imgui_tables.cpp"
+    "${IMGUI_DIR}/imgui_widgets.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_win32.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_dx11.cpp"
 )
 
-target_include_directories(Anvil PRIVATE "${RMLUI_BACKENDS}")
-target_link_libraries(Anvil PRIVATE anvil_core RmlUi::Core d3d11 dxgi d3dcompiler)
+target_include_directories(anvil_imgui PUBLIC "${IMGUI_DIR}" "${IMGUI_DIR}/backends")
+target_link_libraries(anvil_imgui PUBLIC d3d11 dxgi)
 
-# 资源目录随可执行文件部署
-add_custom_command(TARGET Anvil POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:Anvil>/assets"
-    COMMENT "部署 assets")
+# ------------------------------------------------------------------ app
+add_executable(Anvil
+    main/main.cpp
+    ui/gfx.cpp
+    ui/theme.cpp
+    ui/xml_pretty.cpp
+    ui/app.cpp
+)
+
+target_link_libraries(Anvil PRIVATE anvil_core anvil_imgui d3d11 dxgi)
+
+# 声明 DPI 感知，否则窗口坐标被系统虚拟化，与物理像素对不上
+set_target_properties(Anvil PROPERTIES VS_DPI_AWARE "PerMonitor")
