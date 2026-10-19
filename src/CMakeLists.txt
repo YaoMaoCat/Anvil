@@ -1,7 +1,5 @@
 # Anvil 核心与界面目标
 
-set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/third-party/imgui")
-
 # ------------------------------------------------------------------ core
 add_library(anvil_core STATIC
     core/md5.cpp
