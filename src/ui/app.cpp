@@ -6,6 +6,7 @@
 #include "core/serial.h"
 #include "ui/gfx.h"
 #include "ui/theme.h"
+#include "ui/license_type.h"
 #include "ui/version_picker.h"
 #include "ui/xml_pretty.h"
 
@@ -159,10 +160,10 @@ private:
         ImGui::SetNextItemWidth(input_width);
         ImGui::InputText("##serial", serial_, sizeof(serial_));
 
-        ImGui::TextDisabled("学生数");
-        ImGui::SameLine(kLabelOffset * gfx_.Scale());
-        ImGui::SetNextItemWidth(input_width);
-        ImGui::InputText("##students", students_, sizeof(students_), ImGuiInputTextFlags_CharsDecimal);
+        if (DrawLicenseTypeFields(&license_type_, gfx_.Scale())) {
+            status_ = "授权类型：" + LicenseTypeName(license_type_.type) + "，教师 " +
+                      std::to_string(license_type_.teachers) + " / 学生 " + std::to_string(license_type_.students);
+        }
 
         ImGui::TextDisabled("到期");
         ImGui::SameLine(kLabelOffset * gfx_.Scale());
@@ -234,9 +235,9 @@ private:
             spec.product = product;
             spec.subver = product;
         }
-        if (const int students = std::atoi(students_); students > 0) {
-            spec.eclass_value = students;
-        }
+        spec.eclass_type = license_type_.type;
+        spec.eclass_value = license_type_.students;
+        spec.eclass_teacher = license_type_.teachers;
         if (period_[0] != '\0') {
             spec.period = period_;
         }
@@ -280,7 +281,7 @@ private:
     std::string xml_view_;
     char product_[16] = "10652";
     char serial_[64] = "";
-    char students_[16] = "1";
+    LicenseType license_type_;
     char period_[40] = "2099-12-31 23:59:59";
 };
 

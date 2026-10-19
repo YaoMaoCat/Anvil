@@ -61,7 +61,9 @@ void PrintUsage() {
         "  --out <file>       输出路径，默认 <序列号>.lic\n"
         "  --serial <20位>    指定序列号，默认随机\n"
         "  --product <n>      产品号，默认从 Feature.dat 自动读取\n"
-        "  --students <n>     学生席位，默认 1\n"
+        "  --students <n>     学生授权数，默认 1\n"
+        "  --teachers <n>     教师授权数，默认 1\n"
+        "  --etype <n>        授权类型：1=站点 2=学校 4/8=单席位（教师端只接受 1/2）\n"
         "  --period <时间>    到期时间，默认 2099-12-31 23:59:59\n";
 }
 
@@ -166,6 +168,10 @@ int RunGenerate(const std::vector<std::string>& args) {
             product_set = true;
         } else if (key == "--students" && has_value) {
             spec.eclass_value = std::atoi(args[++i].c_str());
+        } else if (key == "--teachers" && has_value) {
+            spec.eclass_teacher = std::atoi(args[++i].c_str());
+        } else if (key == "--etype" && has_value) {
+            spec.eclass_type = std::atoi(args[++i].c_str());
         } else if (key == "--period" && has_value) {
             spec.period = args[++i];
         }
@@ -207,7 +213,9 @@ int RunGenerate(const std::vector<std::string>& args) {
     std::cout << "产品号   : " << spec.product << "\n"
               << "机器码   : " << spec.machine_code << "\n"
               << "序列号   : " << anvil::core::Serial::Pretty(spec.serial) << "\n"
-              << "学生席位 : " << spec.eclass_value << "\n"
+              << "授权类型 : " << spec.eclass_type << "\n"
+              << "教师授权 : " << spec.eclass_teacher << "\n"
+              << "学生授权 : " << spec.eclass_value << "\n"
               << "到期     : " << spec.period << "\n"
               << "已写出   : " << output << "\n";
     return 0;
