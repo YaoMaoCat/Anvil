@@ -35,7 +35,6 @@ add_executable(Anvil
     ui/theme.cpp
     ui/xml_pretty.cpp
     ui/version_picker.cpp
-    ui/license_type.cpp
     ui/app.cpp
 )
 
