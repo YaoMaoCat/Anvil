@@ -237,7 +237,8 @@ private:
         }
         spec.eclass_type = license_type_.type;
         spec.eclass_value = license_type_.students;
-        spec.eclass_teacher = license_type_.teachers;
+        spec.eclass_teacher =
+            LicenseTypeUsesTeachers(license_type_.type) ? license_type_.teachers : 1;
         if (period_[0] != '\0') {
             spec.period = period_;
         }

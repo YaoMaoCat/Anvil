@@ -5,10 +5,10 @@
 namespace anvil::ui {
 
 // <eclass type=.. value=.. teacher=..> 的三个字段
-// 类型取值来自客户端资源里的三类文案（PERSITE / PERSCHOOL / PERSEAT），
-// 其中 1、2 已在本机 2016/2017 版实测通过；4、8 是单席位，教师端掩码=3 会拒绝（返回 0x65）。
+// 1=站点(1 教师+N 学生) 2=单席位(教师) 4=单席位(学生) 8=学校(N 教师+N 学生)
+// 依据：DLL 里只有 type==8 才会解析 teacher 属性；1/2 已实测导入。
 struct LicenseType {
-    int type = 1;       // 1=站点 2=学校 4=单席位(学生) 8=单席位(教师)
+    int type = 1;       // 1=站点 2=单席位(教师) 4=单席位(学生) 8=学校
     int teachers = 1;
     int students = 1;
 };
