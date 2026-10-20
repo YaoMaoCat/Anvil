@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# 静态链接 CRT：发布的单个 exe 不依赖 VC++ 运行库（/MT）
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 if(MSVC)
     add_compile_options(/utf-8 /W4 /permissive-)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX)
